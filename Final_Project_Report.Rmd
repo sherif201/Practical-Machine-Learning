@@ -1,0 +1,134 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Sherif Hesham"
+date: "28 March, 2020٠"
+output: html_document
+---
+
+#Introduction
+
+Human physical activity can now be tracked using devices like Fitbit, Jawbone Up, Nike and others, these devices are used by enthusiasts who like to keep track of their physical activity for various reasons, in this project we analyze the data of 6 participants whose activity were tracked on 4 different areas, namely forearm, arm, belt and dumbell
+
+The participants were asked to perform barbell lifts in 5 different ways, correctly and incorrectly in the following order:
+
+ -Exactly according to the specification (Class A)
+ -Throwing the elbows to the front (Class B) 
+ -Lifting the dumbbell only halfway (Class C) 
+ -Lowering the dumbbell only halfway (Class D) 
+ -Throwing the hips to the front (Class E)
+ 
+ Our goal is to come up with a model that can guess movement type based on the device data, we found that a random forest was the best model with an accuracy rate of 91%
+
+
+
+The data can be acceseed from the following links, it comes from the groupware website, it comes split into training and test set.
+
+Trainig set
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+Test set
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+# Data Processing
+
+##Importing
+
+We first load the necessary packages we're using in the analysis.
+
+```{r}
+# load the required packages
+library(caret); library(rattle); library(rpart); library(rpart.plot)
+library(randomForest); library(repmis)
+```
+
+I've already downloaded the data, so I'll read them directly from the working directory
+```{r}
+# Read the data from the files
+ training <- read.csv("pml-training.csv", na.strings = c("NA", "#DIV/0!", ""), header = TRUE)
+ testing <- read.csv("pml-testing.csv", na.strings = c("NA", "#DIV/0!", ""), header = TRUE)
+```
+
+##Data Manipulation
+
+We'll start by removing any columns that contain missing values and remove the first 7 columns as they won't be beneficial in the analysis.
+
+```{r}
+training <- training[, colSums(is.na(training)) == 0]
+testing <- testing[, colSums(is.na(testing)) == 0]
+trainData <- training[, -c(1:7)]
+testData <- testing[, -c(1:7)]
+```
+
+We then split the training set into 70-30 to make available data for validation.
+
+```{r}
+set.seed(7826) 
+inTrain <- createDataPartition(trainData$classe, p = 0.7, list = FALSE)
+train <- trainData[inTrain, ]
+valid <- trainData[-inTrain, ]
+```
+
+#Model Selection
+
+##Classification Trees
+
+we'll use a classification tree with k=5 for k-fold cross validation
+```{r}
+control <- trainControl(method = "cv", number = 5)
+fit_rpart <- train(classe ~ ., data = train, method = "rpart", 
+                   trControl = control)
+print(fit_rpart, digits = 4)
+```
+
+Constructing a plot to see the clustering
+
+```{r}
+fancyRpartPlot(fit_rpart$finalModel)
+```
+
+Making a confusion matrix to see the model results
+```{r}
+# predict outcomes using validation set
+predict_rpart <- predict(fit_rpart, valid)
+# Show prediction result
+(conf_rpart <- confusionMatrix(valid$classe, predict_rpart))
+```
+
+The accuracy rate is about 50%, the out of sample is about 0.5, this model is equal to coin-flip guessing, we'll try another model.
+
+```{r}
+(accuracy_rpart <- conf_rpart$overall[1])
+```
+
+
+##Random Forest
+```{r}
+
+fit_rf <- train(classe ~ ., data = train, method = "rf", 
+                   trControl = control)
+print(fit_rf, digits = 4)
+```
+
+```{r}
+# predict outcomes using validation set
+predict_rf <- predict(fit_rf, valid)
+# Show prediction result
+(conf_rf <- confusionMatrix(valid$classe, predict_rf))
+```
+
+```{r}
+(accuracy_rf <- conf_rf$overall[1])
+```
+
+This model has a much higher accuracy of 91% with an out-of-sample error rate of 0.009, we'll use it in our prediction.
+
+##Prediction
+
+```{r}
+(predict(fit_rf, testData))
+```
+
+
